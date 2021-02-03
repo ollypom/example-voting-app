@@ -2,54 +2,52 @@ version: "3"
 services:
 
   redis:
-    image: redis:alpine
-    ports:
-      - "6379"
-    networks:
-      - frontend
+    image: public.ecr.aws/bitnami/redis:5.0-debian-10 
+    environment:
+      ALLOW_EMPTY_PASSWORD: 'yes'
+#    networks:
+#      - frontend
     deploy:
       replicas: 1
       update_config:
-        parallelism: 2
+        parallelism: 1
         delay: 10s
       restart_policy:
         condition: on-failure
   db:
-    image: postgres:9.4
+    image: public.ecr.aws/bitnami/postgresql:9.6
     environment:
-      POSTGRES_USER: "postgres"
-      POSTGRES_PASSWORD: "postgres"
+      POSTGRESQL_PASSWORD: "postgres"
     volumes:
       - db-data:/var/lib/postgresql/data
-    networks:
-      - backend
-    deploy:
-      placement:
-        constraints: [node.role == manager]
+#    networks:
+#      - backend
+
   vote:
-    image: dockersamples/examplevotingapp_vote:before
+    image: ${ECR_URL}:vote
     ports:
-      - 5000:80
-    networks:
-      - frontend
+      - 8080:8080
+#    networks:
+#      - frontend
     depends_on:
       - redis
     deploy:
-      replicas: 1
+      replicas: 2
       update_config:
         parallelism: 2
       restart_policy:
         condition: on-failure
+
   result:
-    image: dockersamples/examplevotingapp_result:before
+    image: ${ECR_URL}:result
     ports:
-      - 5001:80
-    networks:
-      - backend
+      - 80:80
+#    networks:
+#      - backend
     depends_on:
       - db
     deploy:
-      replicas: 1
+      replicas: 2
       update_config:
         parallelism: 2
         delay: 10s
@@ -57,15 +55,14 @@ services:
         condition: on-failure
 
   worker:
-    image: dockersamples/examplevotingapp_worker
-    networks:
-      - frontend
-      - backend
+    image: ${ECR_URL}:worker
+#    networks:
+#      - frontend
+#      - backend
     depends_on:
       - db
       - redis
     deploy:
-      mode: replicated
       replicas: 1
       labels: [APP=VOTING]
       restart_policy:
@@ -73,12 +70,10 @@ services:
         delay: 10s
         max_attempts: 3
         window: 120s
-      placement:
-        constraints: [node.role == manager]
 
-networks:
-  frontend:
-  backend:
+#networks:
+#  frontend:
+#  backend:
 
 volumes:
   db-data:
